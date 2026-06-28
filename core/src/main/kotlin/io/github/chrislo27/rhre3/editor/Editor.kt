@@ -18,8 +18,6 @@ import com.fasterxml.jackson.core.JsonParseException
 import io.github.chrislo27.rhre3.PreferenceKeys
 import io.github.chrislo27.rhre3.RHRE3
 import io.github.chrislo27.rhre3.RHRE3Application
-import io.github.chrislo27.rhre3.discord.DiscordHelper
-import io.github.chrislo27.rhre3.discord.PresenceState
 import io.github.chrislo27.rhre3.editor.CameraBehaviour.FOLLOW_PLAYBACK
 import io.github.chrislo27.rhre3.editor.CameraBehaviour.PAN_OVER_SMOOTH
 import io.github.chrislo27.rhre3.editor.ClickOccupation.TrackerResize
@@ -41,7 +39,7 @@ import io.github.chrislo27.rhre3.entity.model.special.SubtitleEntity
 import io.github.chrislo27.rhre3.entity.model.special.TextureEntity
 import io.github.chrislo27.rhre3.midi.MidiHandler
 import io.github.chrislo27.rhre3.modding.ModdingUtils
-import io.github.chrislo27.rhre3.oopsies.ActionGroup
+import io.github.chrislo27.rhre3.undoredo.ActionGroup
 import io.github.chrislo27.rhre3.patternstorage.ClipboardStoredPattern
 import io.github.chrislo27.rhre3.patternstorage.StoredPattern
 import io.github.chrislo27.rhre3.patternstorage.toEntityList
@@ -54,6 +52,7 @@ import io.github.chrislo27.rhre3.sfxdb.GameMetadata
 import io.github.chrislo27.rhre3.sfxdb.SFXDatabase
 import io.github.chrislo27.rhre3.sfxdb.datamodel.Datamodel
 import io.github.chrislo27.rhre3.sfxdb.datamodel.ResponseModel
+import io.github.chrislo27.rhre3.soundsystem.BeadsSoundSystem
 import io.github.chrislo27.rhre3.soundsystem.SoundCache
 import io.github.chrislo27.rhre3.theme.LoadedThemes
 import io.github.chrislo27.rhre3.theme.Theme
@@ -79,7 +78,6 @@ import io.github.chrislo27.rhre3.util.unscaleFont
 import io.github.chrislo27.toolboks.Toolboks
 import io.github.chrislo27.toolboks.i18n.Localization
 import io.github.chrislo27.toolboks.i18n.ToolboksBundle
-import io.github.chrislo27.toolboks.lazysound.LazySound
 import io.github.chrislo27.toolboks.registry.AssetRegistry
 import io.github.chrislo27.toolboks.registry.ScreenRegistry
 import io.github.chrislo27.toolboks.util.MathHelper
@@ -167,19 +165,17 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
 
     private data class AutosaveState(val result: AutosaveResult, var time: Float)
 
-    fun createRemix(addListeners: Boolean = true): Remix {
-        return EditorRemix(main, this).apply {
+    fun createRemix(addListeners: Boolean = true, fromFile: Boolean = true): Remix {
+        val newRemix = EditorRemix(main, this).apply {
             if (addListeners) {
                 playStateListeners += { old, new ->
                     when (new) {
                         STOPPED -> {
                             resetAllSongSubtitles()
-                            DiscordHelper.updatePresence(PresenceState.InEditor)
                             stage.patternPreviewButton.visible = editor.pickerSelection.filter != editor.stage.storedPatternsFilter
                             stage.patternPreviewButton.stop()
                         }
                         PAUSED -> {
-                            DiscordHelper.updatePresence(PresenceState.InEditor)
                             stage.patternPreviewButton.visible = false
                             stage.patternPreviewButton.stop()
                         }
@@ -199,9 +195,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
                             val durationSeconds = tempos.beatsToSeconds(lastPoint) - seconds
                             if (durationSeconds > 5f) {
                                 if (midiInstruments > 0) {
-                                    DiscordHelper.updatePresence(PresenceState.Elapsable.PlayingMidi(durationSeconds))
                                 } else if (stage.playalongStage.visible) {
-                                    DiscordHelper.updatePresence(PresenceState.PlayingAlong)
                                 }
                             }
 
@@ -214,6 +208,12 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
                 }
             }
         }
+        if(!fromFile){
+            newRemix.timeSignatures.add(TimeSignature(newRemix.timeSignatures, 0f,
+                TimeSignature.DEFAULT_NOTE_UNIT,
+                TimeSignature.DEFAULT_NOTE_UNIT))
+        }
+        return newRemix
     }
 
     val camera: OrthographicCamera by lazy {
@@ -235,7 +235,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
     var cameraPan: CameraPan? = null
 
     val pickerSelection: PickerSelection = PickerSelection()
-    var remix: Remix = createRemix()
+    var remix: Remix = createRemix(fromFile = false)
         set(value) {
             field.dispose()
             field = value
@@ -310,6 +310,18 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
     internal val buildingNotes = mutableMapOf<MidiHandler.MidiReceiver.Note, BuildingNote>()
 
     val glassEffect: GlassEffect = GlassEffect(main, this)
+
+    init{
+        if(main.preferences.getBoolean(PreferenceKeys.SETTINGS_LIVE_WAVEFORM)){
+            views.add(ViewType.WAVEFORM)
+        }
+        if(main.preferences.getBoolean(PreferenceKeys.SETTINGS_CHORUS_KIDS)){
+            views.add(ViewType.GLEE_CLUB)
+        }
+        //volume
+        val volume: Float = main.preferences.getFloat(PreferenceKeys.SETTINGS_AUDIO_VOLUME, 1f)
+        BeadsSoundSystem.audioContext.out.gain = (exp(6.908*volume)/1000).toFloat()
+    }
 
     fun resetAutosaveTimer() {
         autosaveFrequency = main.preferences.getInteger(PreferenceKeys.SETTINGS_AUTOSAVE,
@@ -755,30 +767,6 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
                 borderedFont.unscaleFont()
                 batch.setColor(1f, 1f, 1f, 1f)
             }
-
-            if (remix.tempos.secondsMap.isEmpty()) {
-                val borderedFont = main.defaultBorderedFont
-                borderedFont.scaleFont(staticCamera)
-                borderedFont.scaleMul(1f)
-
-                if (remix.playState != STOPPED) {
-                    // This shouldn't be called since remixes aren't supposed to be playable without tempo changes
-                    this.renderImplicitTempo(batch)
-                }
-
-                borderedFont.setColor(1f, 1f, 1f, 1f)
-
-                val startX = 6f
-                val startY = (stage.centreAreaStage.location.realY / Gdx.graphics.height) * staticCamera.viewportHeight + 6f
-                val height = 32f
-                val width = 32f
-
-                borderedFont.drawCompressed(batch, Localization["editor.noTempo"],
-                                            startX, startY + height * 0.5f + borderedFont.capHeight * 0.5f,
-                                            staticCamera.viewportWidth - width, Align.center)
-
-                borderedFont.unscaleFont()
-            }
         }
 
         font.unscaleFont()
@@ -823,10 +811,10 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
 
         if (!stage.isTyping) {
             if (Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W)) {
-                Gdx.input.inputProcessor.scrolled(-1)
+                Gdx.input.inputProcessor.scrolled(0f, -1f)
             }
             if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || (Gdx.input.isKeyJustPressed(Input.Keys.S) && !control)) {
-                Gdx.input.inputProcessor.scrolled(1)
+                Gdx.input.inputProcessor.scrolled(0f, 1f)
             }
 
             if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
@@ -1634,7 +1622,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
                         }
                     } else if (getTrackerOnMouse(tool.trackerClass.java, false) == null) {
                         val tr = when (tool) {
-                            Tool.TEMPO_CHANGE -> {
+                            Tool.TEMPO_CHANGE, Tool.SWING -> {
                                 val tempoScale = if (shift && !alt) 0.5f else if (!shift && alt) 2f else 1f
                                 TempoChange(remix.tempos, beat, (remix.tempos.tempoAt(beat) * tempoScale).coerceIn(TempoChange.MIN_TEMPO, TempoChange.MAX_TEMPO), remix.tempos.swingAt(beat), 0f)
                             }
@@ -2004,11 +1992,12 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
         }
     }
 
-    override fun scrolled(amount: Int): Boolean {
+    override fun scrolled(amountX: Float, amountY:  Float): Boolean {
         if (remix.playState != STOPPED) {
             return false
         }
 
+        val amountScrolled = ceil(amountY).toInt()
         val selection = selection
         val tool = currentTool
         val control = Gdx.input.isControlDown()
@@ -2016,12 +2005,12 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
         if (tool == Tool.SELECTION && selection.isNotEmpty() && !shift) {
             when (scrollMode) {
                 Editor.ScrollMode.PITCH -> {
-                    changePitchOfSelection(-amount * (if (control) 2 else 1), true, false, selection)
+                    changePitchOfSelection(-amountScrolled * (if (control) 2 else 1), true, false, selection)
                 }
                 Editor.ScrollMode.VOLUME -> {
                     val volumetrics = selection.filter { it is IVolumetric && it.isVolumetric }
                     val oldVolumes: List<Int> = volumetrics.map { (it as IVolumetric).volumePercent }
-                    val changeAmount = -amount * (if (control) 25 else 5)
+                    val changeAmount = -amountScrolled * (if (control) 25 else 5)
 
                     val anyChanged = selection.fold(false) { acc, it ->
                         if (it is IVolumetric && it.isVolumetric) {
@@ -2064,7 +2053,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
             val inputBeat = if (snap == 0f) inputX else floor(inputX.toDouble() / snap).toFloat() * snap
             if (timeSig != null && MathUtils.isEqual(inputBeat, timeSig.beat)) {
                 if (!shift) {
-                    val change = -amount * (if (control) 5 else 1)
+                    val change = -amountScrolled * (if (control) 5 else 1)
                     val newDivisions = (timeSig.beatsPerMeasure + change)
                             .coerceIn(TimeSignature.LOWER_BEATS_PER_MEASURE, TimeSignature.UPPER_BEATS_PER_MEASURE)
                     if ((change < 0 && timeSig.beatsPerMeasure > TimeSignature.LOWER_BEATS_PER_MEASURE) || (change > 0 && timeSig.beatsPerMeasure < TimeSignature.UPPER_BEATS_PER_MEASURE)) {
@@ -2080,7 +2069,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
                         return true
                     }
                 } else if (shift && !control) {
-                    val change = -amount
+                    val change = -amountScrolled
                     val index = TimeSignature.NOTE_UNITS.indexOf(timeSig.beatUnit).takeUnless { it == -1 } ?: TimeSignature.NOTE_UNITS.indexOf(TimeSignature.DEFAULT_NOTE_UNIT)
                     val newUnits = TimeSignature.NOTE_UNITS[(index + change).coerceIn(0, TimeSignature.NOTE_UNITS.size - 1)]
                     if (newUnits != timeSig.beatUnit) {
@@ -2097,10 +2086,10 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
                     }
                 }
             }
-        } else if (tool.isTrackerRelated) {
+        } else if (tool.isTrackerRelated && tool != Tool.SWING) {
             val tracker = getTrackerOnMouse(tool.trackerClass?.java, true)
             if (tracker != null) {
-                val result = tracker.scroll(-amount, control, shift)
+                val result = tracker.scroll(-amountScrolled, control, shift)
 
                 if (result != null) {
                     val lastAction: TrackerValueChange? = remix.getUndoStack().peekFirst() as? TrackerValueChange?
@@ -2118,7 +2107,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
         } else if (tool == Tool.SWING) {
             val tracker = getTrackerOnMouse(TempoChange::class.java, true) as? TempoChange?
             if (tracker != null) {
-                val result = tracker.scrollSwing(-amount, control, shift)
+                val result = tracker.scrollSwing(-amountScrolled, control, shift)
 
                 if (result != null) {
                     val lastAction: TrackerValueChange? = remix.getUndoStack().peekFirst() as? TrackerValueChange?
@@ -2137,7 +2126,7 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
 
         if (shift && tool != Tool.TIME_SIGNATURE) {
             // Camera scrolling left/right (CTRL/SHIFT+CTRL)
-            val amt = (amount * if (control) 5f else 1f)
+            val amt = (amountScrolled * if (control) 5f else 1f)
             camera.position.x += amt
             camera.update()
 
@@ -2156,6 +2145,10 @@ class Editor(val main: RHRE3Application, stageCamera: OrthographicCamera, attach
     }
 
     override fun touchDragged(screenX: Int, screenY: Int, pointer: Int): Boolean {
+        return false
+    }
+
+    override fun touchCancelled(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
         return false
     }
 

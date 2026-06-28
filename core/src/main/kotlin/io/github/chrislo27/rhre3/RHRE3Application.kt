@@ -14,10 +14,7 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.utils.Align
 import io.github.chrislo27.rhre3.analytics.AnalyticsHandler
-import io.github.chrislo27.rhre3.discord.DiscordHelper
-import io.github.chrislo27.rhre3.discord.PresenceState
 import io.github.chrislo27.rhre3.init.DefaultAssetLoader
-import io.github.chrislo27.rhre3.lc.LC
 import io.github.chrislo27.rhre3.midi.MidiHandler
 import io.github.chrislo27.rhre3.modding.ModdingGame
 import io.github.chrislo27.rhre3.modding.ModdingUtils
@@ -171,6 +168,9 @@ class RHRE3Application(logger: Logger, logToFile: File?)
     
     lateinit var hueBar: Texture
         private set
+
+    lateinit var volumeBar: Texture
+        private set
     
     override val programLaunchArguments: List<String>
         get() = RHRE3.launchArguments
@@ -244,6 +244,16 @@ class RHRE3Application(logger: Logger, logToFile: File?)
             }
             Toolboks.LOGGER.info("Generated hue bar texture")
         }
+        // Generate volume bar
+        run {
+            val pixmap = Pixmap(100, 100, Pixmap.Format.RGBA8888)
+            pixmap.setColor(Color(1f, 1f, 1f, 1f))
+            pixmap.fillTriangle(0, 100, 100, 100, 100, 0)
+            volumeBar = Texture(pixmap).apply {
+                this.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+            }
+            Toolboks.LOGGER.info("Generated volume bar texture")
+        }
         
         // preferences
         preferences = Gdx.app.getPreferences("RHRE3")
@@ -276,14 +286,13 @@ class RHRE3Application(logger: Logger, logToFile: File?)
         val mixer: Mixer? = BeadsSoundSystem.supportedMixers.firstOrNull { it.mixerInfo.name == mixerName }
         BeadsSoundSystem.regenerateAudioContexts(mixer ?: BeadsSoundSystem.getDefaultMixer())
         Toolboks.LOGGER.info("Loaded audio mixer from prefs: name=$mixerName, mixer found?=${mixer != null}")
+        Toolboks.LOGGER.info("Loaded audio volume from prefs")
         Toolboks.LOGGER.info("Loaded persistent data from preferences")
         
         val discordRpcEnabled = preferences.getBoolean(PreferenceKeys.SETTINGS_DISCORD_RPC_ENABLED, true)
         GlobalScope.launch {
             Toolboks.LOGGER.info("Starting Discord RPC")
             val nano = measureNanoTime {
-                DiscordHelper.init(enabled = discordRpcEnabled)
-                DiscordHelper.updatePresence(PresenceState.Loading)
             }
             Toolboks.LOGGER.info("Discord RPC started successfully in ${nano / 1000000.0} ms")
         }
@@ -308,7 +317,6 @@ class RHRE3Application(logger: Logger, logToFile: File?)
                 ScreenRegistry += "recoverRemix" to RecoverRemixScreen(this)
                 ScreenRegistry += "editorVersion" to EditorVersionScreen(this)
                 ScreenRegistry += "news" to NewsScreen(this)
-                ScreenRegistry += "partners" to PartnersScreen(this)
                 ScreenRegistry += "advancedOptions" to AdvancedOptionsScreen(this)
             }
             
@@ -353,8 +361,6 @@ class RHRE3Application(logger: Logger, logToFile: File?)
                     val req = httpClient.prepareGet("https://api.rhre.dev:10443/rhre3/live")
                             .addHeader("User-Agent", "RHRE ${RHRE3.VERSION}")
                             .addHeader("X-Analytics-ID", AnalyticsHandler.getUUID())
-                            .addHeader("X-D-ID", DiscordHelper.currentUser?.userId ?: "null")
-                            .addHeader("X-D-U", DiscordHelper.currentUser?.let { "${it.username}#${it.discriminator}" } ?: "null")
                             .execute().get()
                     
                     if (req.statusCode == 200) {
@@ -401,8 +407,6 @@ class RHRE3Application(logger: Logger, logToFile: File?)
                 e.printStackTrace()
             }
         }
-        
-        LC(this).all()
     }
     
     fun fetchGithubVersion() {

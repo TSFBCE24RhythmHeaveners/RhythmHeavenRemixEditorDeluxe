@@ -117,6 +117,7 @@ class DefaultAssetLoader : AssetRegistry.IAssetLoader {
         AssetRegistry.loadAsset<Texture>("ui_icon_nametag", "images/ui/icons/nametag.png")
         AssetRegistry.loadAsset<Texture>("ui_icon_photo", "images/ui/icons/photo.png", linearTexture())
         AssetRegistry.loadAsset<Texture>("ui_icon_bouncy_road_mania", "images/ui/icons/bouncy_road_mania_32.png")
+        AssetRegistry.loadAsset<Texture>("ui_icon_polyrhythm_mania", "images/ui/icons/polyrhythm_mania_32.png")
         AssetRegistry.loadAsset<Texture>("ui_stripe_board", "images/ui/stripe_board.png", linearTexture())
         AssetRegistry.loadAsset<Texture>("ui_breaking", "images/ui/breaking.png")
         AssetRegistry.loadAsset<Texture>("ui_transparent_checkerboard", "images/ui/transparent_checkerboard.png")
@@ -138,8 +139,7 @@ class DefaultAssetLoader : AssetRegistry.IAssetLoader {
         
         AssetRegistry.loadAsset<Texture>("menu_bg_square", "images/menu/bg_square.png")
         AssetRegistry.loadAsset<Texture>("menu_snowflake", "images/menu/snowflake.png", linearTexture())
-        
-        AssetRegistry.loadAsset<Texture>("weird_wakaaa", "images/etc/wakaaa.png", linearTexture())
+
         AssetRegistry.loadAsset<Sound>("weird_sfx_honk", "sound/honk.ogg")
         AssetRegistry.loadAsset<Sound>("weird_sfx_bts_c", "sound/c.ogg")
         AssetRegistry.loadAsset<Sound>("weird_sfx_bts_pew", "sound/pew.ogg")

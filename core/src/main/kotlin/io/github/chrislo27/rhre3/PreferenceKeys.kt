@@ -26,6 +26,11 @@ object PreferenceKeys {
     val SETTINGS_CLOSE_WARNING = "settings_closeWarning"
     val SETTINGS_DISABLE_TIME_STRETCHING = "settings_disableTimeStretching"
     val SETTINGS_AUDIO_MIXER = "settings_audioMixer"
+    val SETTINGS_AUDIO_VOLUME = "settings_audioVolume"
+
+    val SETTINGS_LIVE_WAVEFORM = "settings_liveWaveform"
+    val SETTINGS_CHORUS_KIDS = "settings_chorusKids"
+    val SETTINGS_GAME_BOUNDARIES = "settings_gameBoundaries"
 
     val allSettingsKeys: List<String> =
         listOf(SETTINGS_DISABLE_MINIMAP, SETTINGS_MINIMAP_PREVIEW, SETTINGS_AUTOSAVE, SETTINGS_CAMERA_BEHAVIOUR,
@@ -57,7 +62,6 @@ object PreferenceKeys {
     val LAST_NEWS = "lastNewsArticles"
     val READ_NEWS = "readNewsArticles"
     val PADDLER_LOADING_ICON = "paddlerLoadingIcon"
-    val VIEWED_PARTNERS_VERSION = "viewedPartnersVersion"
     val PLAYALONG_CONTROLS = "playalongControls"
     val PLAYALONG_CONTROLLER_MAPPINGS = "playalongControllerMappings"
     val PLAYALONG_CALIBRATION_KEY = "playalongCalibrationKey"
@@ -65,13 +69,6 @@ object PreferenceKeys {
     val PLAYALONG_SFX_PERFECT_FAIL = "playalongSfxPerfectFail"
     val PLAYALONG_SFX_MONSTER_FAIL = "playalongSfxMonsterFail"
     val PLAYALONG_SFX_MONSTER_ACE = "playalongSfxMonsterAce"
-    val EXTRAS_UPBEAT_HIGH_SCORE = "extras_upbeat_highScore"
-    val EXTRAS_UPBEAT_TIMES_PLAYED = "extras_upbeat_timesPlayed"
-    val EXTRAS_UPBEAT_HARD_HIGH_SCORE = "extras_upbeatHard_highScore"
-    val EXTRAS_UPBEAT_HARD_TIMES_PLAYED = "extras_upbeatHard_timesPlayed"
-    val EXTRAS_QUIZ_HIGH_SCORE = "extras_quiz_highScore"
-    val EXTRAS_QUIZ_TIMES_PLAYED = "extras_quiz_timesPlayed"
-
     val EVENT_PREFIX = "event_"
 
 }

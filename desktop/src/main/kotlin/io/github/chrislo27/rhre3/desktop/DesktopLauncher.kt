@@ -1,7 +1,6 @@
 package io.github.chrislo27.rhre3.desktop
 
 import com.badlogic.gdx.Files
-import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.glutils.HdpiMode
 import com.beust.jcommander.JCommander
@@ -16,7 +15,7 @@ import java.io.File
 object DesktopLauncher {
     
     private fun printHelp(jCommander: JCommander) {
-        println("${RHRE3.TITLE} ${RHRE3.VERSION}\n${RHRE3.GITHUB}\n\n${StringBuilder().apply { jCommander.usage(this) }}")
+        println("${RHRE3.TITLE} ${RHRE3.VERSION}\n${RHRE3.GITHUB}\n\n${StringBuilder().apply { jCommander.usage() }}")
     }
     
     @JvmStatic
@@ -64,6 +63,17 @@ object DesktopLauncher {
 //                    this.setBackBufferConfig(8, 8, 8, 8, 16, 0, 2)
                     if (portable) {
                         this.setPreferencesConfig(".rhre3/.prefs/", Files.FileType.Local)
+                    } else {
+                        logger.info("Setting preference folder to "+System.getProperty("user.home")+"/.rhre3/prefs")
+                        val newPrefFolder = File(System.getProperty("user.home")+"/.rhre3/prefs")
+                        if(!newPrefFolder.exists()){
+                            val prefFolder = File(System.getProperty("user.home")+"/.prefs")
+                            if(prefFolder.exists() && prefFolder.isDirectory()){
+                                prefFolder.copyRecursively(File(System.getProperty("user.home") + "/.rhre3/prefs"))
+                                logger.info("Copied older preference folder")
+                            }
+                        }
+                        this.setPreferencesConfig(System.getProperty("user.home") + "/.rhre3/prefs/", Files.FileType.Absolute)
                     }
                     
                     RHRE3.portableMode = portable

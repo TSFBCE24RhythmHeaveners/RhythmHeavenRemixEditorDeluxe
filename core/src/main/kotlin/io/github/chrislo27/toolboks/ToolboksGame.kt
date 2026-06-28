@@ -176,7 +176,7 @@ abstract class ToolboksGame(val logger: Logger, val logToFile: File?,
                 val string =
                         """FPS: [${if (fps <= 10) "RED" else if (fps < 30) "YELLOW" else "WHITE"}]$fps[]
 Debug mode: ${Toolboks.DEBUG_KEY_NAME}
-  While holding ${Toolboks.DEBUG_KEY_NAME}: I - Reload L10N | S - Stage outlines (SHIFT for only visible) | G - gc
+  While holding ${Toolboks.DEBUG_KEY_NAME}: I - Reload L10N | S - Stage outlines (SHIFT for only visible) | D - Reload SFXDB | G - gc
 Version: $versionString
 Memory: ${numberFormatInstance.format(Gdx.app.nativeHeap / 1024)} / ${numberFormatInstance.format(
                                 MemoryUtils.maxMemory)} KB (${numberFormatInstance.format(memoryDelta / 1024)} KB/s)
@@ -324,6 +324,7 @@ ${(screen as? ToolboksScreen<*, *>)?.getDebugString() ?: ""}"""
                     } else if (Toolboks.stageOutlines == NONE) ALL else NONE
                     Toolboks.LOGGER.debug("Toggled stage outlines to ${Toolboks.stageOutlines}")
                 }
+                Input.Keys.D -> setScreen(ScreenRegistry.getNonNull("sfxdbLoad"))
                 Input.Keys.G -> System.gc()
                 else -> {
                     pressed = false
@@ -370,11 +371,17 @@ ${(screen as? ToolboksScreen<*, *>)?.getDebugString() ?: ""}"""
         return false
     }
 
-    override fun scrolled(amount: Int): Boolean {
+    //Not implemented.
+    override fun scrolled(p0: Float, p1: Float): Boolean {
         return false
     }
 
     override fun touchDragged(screenX: Int, screenY: Int, pointer: Int): Boolean {
         return false
     }
+
+    override fun touchCancelled(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
+        return false
+    }
+
 }

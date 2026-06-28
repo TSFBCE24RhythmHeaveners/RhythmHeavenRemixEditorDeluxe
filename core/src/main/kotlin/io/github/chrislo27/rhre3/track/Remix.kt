@@ -20,7 +20,7 @@ import io.github.chrislo27.rhre3.entity.model.ModelEntity
 import io.github.chrislo27.rhre3.entity.model.cue.CueEntity
 import io.github.chrislo27.rhre3.entity.model.multipart.EquidistantEntity
 import io.github.chrislo27.rhre3.entity.model.special.*
-import io.github.chrislo27.rhre3.oopsies.ActionHistory
+import io.github.chrislo27.rhre3.undoredo.ActionHistory
 import io.github.chrislo27.rhre3.playalong.Playalong
 import io.github.chrislo27.rhre3.rhre2.RemixObject
 import io.github.chrislo27.rhre3.sfxdb.Game
@@ -29,6 +29,7 @@ import io.github.chrislo27.rhre3.sfxdb.datamodel.impl.Cue
 import io.github.chrislo27.rhre3.sfxdb.datamodel.impl.special.Subtitle
 import io.github.chrislo27.rhre3.soundsystem.*
 import io.github.chrislo27.rhre3.track.timesignature.TimeSignature
+import io.github.chrislo27.rhre3.track.timesignature.TimeSignatureAction
 import io.github.chrislo27.rhre3.track.timesignature.TimeSignatures
 import io.github.chrislo27.rhre3.track.tracker.TrackerContainer
 import io.github.chrislo27.rhre3.track.tracker.musicvolume.MusicVolumeChange
@@ -87,6 +88,8 @@ open class Remix(val main: RHRE3Application)
 
                 tree.put("playbackStart", playbackStart)
                 tree.put("musicStartSec", musicStartSec)
+
+                tree.put("defaultTempo",tempos.defaultTempo)
 
                 tree.put("trackCount", trackCount)
 
@@ -173,7 +176,24 @@ open class Remix(val main: RHRE3Application)
                 remix.tempos.fromTree(trackers["tempos"] as ObjectNode)
                 remix.musicVolumes.fromTree(trackers["musicVolumes"] as ObjectNode)
             }
-            
+
+            // Used to "update" a remix to the global tempo system
+            fun determineDefaultTempo(): Float {
+                if(remix.tempos.secondsMap.values.isNotEmpty()){
+                    var earliestChange = remix.tempos.secondsMap.values.first()
+                    for(tempoChange in remix.tempos.secondsMap.values){
+                        if(earliestChange.beat > tempoChange.beat){
+                            earliestChange = tempoChange
+                        }
+                    }
+                    return earliestChange.bpm
+                }
+                return 120f
+            }
+
+            remix.tempos.defaultTempo = tree["defaultTempo"]?.floatValue() ?: determineDefaultTempo()
+
+
             // entities
             val entitiesArray = tree["entities"] as ArrayNode
             entitiesArray.filterIsInstance<ObjectNode>()
@@ -380,7 +400,7 @@ open class Remix(val main: RHRE3Application)
         }
 
         fun pack(remix: Remix, stream: ZipOutputStream, isAutosave: Boolean) {
-            val objectNode = Remix.toJson(remix, isAutosave)
+            val objectNode = toJson(remix, isAutosave)
             stream.setComment("Rhythm Heaven Remix Editor 3 savefile - ${RHRE3.VERSION}")
 
             stream.putNextEntry(ZipEntry("remix.json"))
@@ -418,7 +438,7 @@ open class Remix(val main: RHRE3Application)
             val musicNode = objectNode["musicData"] as ObjectNode
             val musicPresent = musicNode["present"].booleanValue()
 
-            val result = Remix.fromJson(objectNode, remix, preloadSounds)
+            val result = fromJson(objectNode, remix, preloadSounds)
 
             if (musicPresent) {
                 val folder = RHRE3.tmpMusic
@@ -568,6 +588,7 @@ open class Remix(val main: RHRE3Application)
         }
     }
 
+
     enum class EntityUpdateResult {
         NOT_STARTED, STARTED, UPDATED, ENDED, STARTED_AND_ENDED, ALREADY_UPDATED
     }
@@ -664,8 +685,6 @@ open class Remix(val main: RHRE3Application)
     var suppressDerivativeAudioLoading: Boolean = false
     val playStateListeners: MutableList<(old: PlayState, new: PlayState) -> Unit> = mutableListOf()
     var playState: PlayState by Delegates.vetoable(PlayState.STOPPED) { _, old, new ->
-        if (new == PlayState.PLAYING && !canPlayRemix)
-            return@vetoable false
         val music = music
         playStateListeners.forEach { it.invoke(old, new) }
         when (new) {
@@ -721,8 +740,7 @@ open class Remix(val main: RHRE3Application)
         true
     }
     var isExporting: Boolean = false
-    val canPlayRemix: Boolean
-        get() = tempos.secondsMap.isNotEmpty()
+
 
     private fun setMusicVolume() {
         val music = music ?: return
@@ -975,6 +993,7 @@ open class Remix(val main: RHRE3Application)
             playState = PlayState.STOPPED
         }
     }
+
 
     override fun dispose() {
         music?.dispose()

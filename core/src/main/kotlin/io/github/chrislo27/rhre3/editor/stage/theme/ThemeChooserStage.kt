@@ -25,6 +25,7 @@ class ThemeChooserStage(val editor: Editor, val palette: UIPalette, parent: Edit
         get() = editor.main.preferences
 
     val title: TextLabel<EditorScreen>
+    val closeButton: Button<EditorScreen>
     private val chooserButtonBar: Stage<EditorScreen>
     private val themeList: ThemeListStage<Theme>
     val themeEditor: ThemeEditorStage
@@ -35,7 +36,7 @@ class ThemeChooserStage(val editor: Editor, val palette: UIPalette, parent: Edit
             this.colour.a = 0.8f
         }
 
-        themeList = object : ThemeListStage<Theme>(editor, palette, this@ThemeChooserStage, this@ThemeChooserStage.camera, 362f, 352f) {
+        themeList = object : ThemeListStage<Theme>(editor, palette, this@ThemeChooserStage, this@ThemeChooserStage.camera, 362f, 318f) {
             override val itemList: List<Theme> get() = LoadedThemes.themes
 
             override fun getItemName(item: Theme): String = item.name
@@ -54,9 +55,30 @@ class ThemeChooserStage(val editor: Editor, val palette: UIPalette, parent: Edit
             }
         }.apply {
             location.set(screenX = 0f, screenY = 0f, screenWidth = 0f, screenHeight = 0f,
-                         pixelX = 20f, pixelY = 53f, pixelWidth = 362f, pixelHeight = 352f)
+                         pixelX = 20f, pixelY = 87f, pixelWidth = 362f, pixelHeight = 318f)
         }
         this.elements += themeList
+
+        closeButton = object : Button<EditorScreen>(palette, this, this.stage) {
+            override fun onLeftClick(xPercent: Float, yPercent: Float) {
+                super.onLeftClick(xPercent, yPercent)
+                val chooserStage = editor.stage.themeChooserStage
+                val wasVisible = chooserStage.visible
+                editor.stage.paneLikeStages.forEach { it.visible = false }
+                chooserStage.visible = !wasVisible
+                if (chooserStage.visible) {
+                    chooserStage.resetEverything()
+                }
+            }
+        }.apply {
+            this.location.set(screenX = 0f, screenWidth = 0f, screenY = 0f, screenHeight = 0f,
+                              pixelX = 20f, pixelY = 50f, pixelWidth = 34f, pixelHeight = 34f)
+            this.alignment = Align.topLeft
+            this.addLabel(ImageLabel(palette, this, this.stage).apply {
+                this.image = TextureRegion(AssetRegistry.get<Texture>("ui_search_clear"))
+            })
+        }
+        this.elements += closeButton
 
         title = TextLabel(palette, this, this).apply {
             this.location.set(screenX = 0f, screenWidth = 1f, screenY = 0.875f, screenHeight = 0.125f)
@@ -78,7 +100,7 @@ class ThemeChooserStage(val editor: Editor, val palette: UIPalette, parent: Edit
 
         chooserButtonBar = Stage(this, this.camera, 346f, 34f).apply {
             location.set(screenX = 0f, screenY = 0f, screenWidth = 0f, screenHeight = 0f,
-                         pixelX = 20f, pixelY = 13f, pixelWidth = 346f, pixelHeight = 34f)
+                         pixelX = 20f, pixelY = 47f, pixelWidth = 346f, pixelHeight = 34f)
             this.elements += Button(palette, this, this.stage).apply {
                 this.location.set(0f, 0f, 0f, 1f, 0f, 0f, 346f - 34f * 2f - 8f * 2f, 0f)
                 this.addLabel(TextLabel(palette, this, this.stage).apply {
@@ -129,11 +151,30 @@ class ThemeChooserStage(val editor: Editor, val palette: UIPalette, parent: Edit
             }
         }
         this.elements += chooserButtonBar
+
+        this.elements += object : Button<EditorScreen>(palette, this, this.stage) {
+            override fun onLeftClick(xPercent: Float, yPercent: Float) {
+                super.onLeftClick(xPercent, yPercent)
+                val main = editor.main
+                main.settings.themeUsesMenu = !main.settings.themeUsesMenu
+                main.settings.persist()
+            }
+        }.apply {
+            this.location.set(screenWidth= 0f, screenHeight = 0f, pixelX = 20f, pixelY = 7f, pixelHeight = 34f, pixelWidth = 346f)
+            this.addLabel(TextLabel(palette, this, this.stage).apply {
+                this.isLocalizationKey = true
+                this.text = "editor.themeMenuBackgroundToggle"
+                this.textWrapping = true
+                this.fontScaleMultiplier = 0.75f
+                this.location.set(pixelWidth = -4f, pixelX = 2f)
+            })
+        }
     }
 
     fun updateVisibility(inThemeEditor: Boolean) {
         themeEditor.visible = inThemeEditor
         chooserButtonBar.visible = !inThemeEditor
+        closeButton.visible = !inThemeEditor
         themeList.visible = !inThemeEditor
     }
     

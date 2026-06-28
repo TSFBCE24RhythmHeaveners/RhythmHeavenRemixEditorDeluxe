@@ -18,8 +18,6 @@ import io.github.chrislo27.rhre3.PreferenceKeys
 import io.github.chrislo27.rhre3.RHRE3
 import io.github.chrislo27.rhre3.RHRE3Application
 import io.github.chrislo27.rhre3.analytics.AnalyticsHandler
-import io.github.chrislo27.rhre3.discord.DiscordHelper
-import io.github.chrislo27.rhre3.discord.PresenceState
 import io.github.chrislo27.rhre3.editor.Editor
 import io.github.chrislo27.rhre3.entity.model.ISoundDependent
 import io.github.chrislo27.rhre3.entity.model.special.MusicDistortEntity
@@ -82,7 +80,7 @@ class ExportRemixScreen(main: RHRE3Application)
             setBackButtonEnabled()
         }
     private var partial = false
-    private var isCapableOfExporting = false
+    private var hasEndRemix = false
     private val mainLabel: TextLabel<ExportRemixScreen>
     private val folderButton: Button<ExportRemixScreen>
     private var folderFile: File? = null
@@ -195,7 +193,7 @@ class ExportRemixScreen(main: RHRE3Application)
                        startSeconds: Float = selectionStage.percentToSeconds(selectionStage.startPercent),
                        endSeconds: Float = selectionStage.percentToSeconds(selectionStage.endPercent),
                        exportOptions: ExportOptions = RHRE3.exportOptions) {
-        if (isExporting || !isCapableOfExporting)
+        if (isExporting || !hasEndRemix)
             return
         isExporting = true
         BeadsSoundSystem.isRealtime = false
@@ -261,7 +259,7 @@ class ExportRemixScreen(main: RHRE3Application)
             remix.playState = PlayState.STOPPED
             
             if (success) {
-                val commentTag = "Made with Rhythm Heaven Remix Editor ${RHRE3.VERSION}"
+                val commentTag = "Made with Rhythm Heaven Remix Editor Advance ${RHRE3.VERSION}"
                 when (fileType) {
                     WAV -> {
                         // nothing
@@ -474,7 +472,7 @@ class ExportRemixScreen(main: RHRE3Application)
     
     @Synchronized
     private fun openPicker() {
-        if (!isChooserOpen && !isExporting && isCapableOfExporting) {
+        if (!isChooserOpen && !isExporting && hasEndRemix) {
             GlobalScope.launch {
                 isChooserOpen = true
                 Gdx.app.postRunnable {
@@ -490,7 +488,6 @@ class ExportRemixScreen(main: RHRE3Application)
                         val newInitialDirectory = if (!file.isDirectory) file.parentFile else file
                         persistDirectory(main, PreferenceKeys.FILE_CHOOSER_EXPORT, newInitialDirectory)
                         GlobalScope.launch {
-                            DiscordHelper.updatePresence(PresenceState.Exporting)
                             try {
                                 val correctFile = if (file.extension.toLowerCase(Locale.ROOT) !in ExportFileType.EXTENSIONS)
                                     file.parentFile.resolve("${file.name}.mp3")
@@ -530,19 +527,13 @@ class ExportRemixScreen(main: RHRE3Application)
     
     private fun updateLabels(throwable: Throwable? = null) {
         val label = mainLabel
-        val hasEndRemix = remix.duration < Float.POSITIVE_INFINITY
-        val hasTempoChanges = remix.tempos.secondsMap.isNotEmpty()
+        hasEndRemix = remix.duration < Float.POSITIVE_INFINITY
         readyButton.visible = false
         folderButton.visible = false
         folderFile = null
         selectionStage.visible = false
-        isCapableOfExporting = hasEndRemix && hasTempoChanges
-        if (!isCapableOfExporting) {
-            if (!hasEndRemix) {
+        if (!hasEndRemix) {
                 label.text = Localization["screen.export.cannot", Localization["screen.export.needsEndRemix", SFXDatabase.data.objectMap[SFXDatabase.END_REMIX_ENTITY_ID]?.name] + "\n[LIGHT_GRAY]${Localization[Series.OTHER.localization]} ➡ ${SFXDatabase.data.specialGame.name} ➡ ${SFXDatabase.data.objectMap[SFXDatabase.END_REMIX_ENTITY_ID]?.name ?: "End Remix"}[]"]
-            } else if (!hasTempoChanges) {
-                label.text = Localization["screen.export.cannot", Localization["screen.export.needsTempoChanges"]]
-            }
         } else {
             if (throwable == null) {
                 label.text = Localization["screen.export.prepare"]
